@@ -121,8 +121,12 @@
     requestAnimationFrame(frame);
   }
 
-  // ---------- the fixed side-on camera: the hotel's full width, about 4½ floors high, gliding with the courier ----------
-  const BOX = { x0: -11.2, x1: 11.2, h: 13.6 };
+  // ---------- the fixed side-on camera: the hotel's full width, about 4½ floors high ----------
+  // The camera's eye stays level with the courier's feet and moves with him, floor for floor, with no lag; a lens shift
+  // (setViewOffset) puts him in the lower middle of the free part of the screen. So riding down never makes him drift
+  // back up the screen when the lift stops, and stepping back into a lift (further from the camera) can't lift him on
+  // screen either: things level with the eye stay on the same screen line however far away they are.
+  const BOX = { x0: -11.2, x1: 11.2, h: 13.6 }, ABOVE = 1.4;
   function fit() {
     const W = innerWidth, H = innerHeight;
     renderer.setSize(W, H, false);
@@ -141,35 +145,30 @@
     const k = Math.min(sw / (BOX.x1 - BOX.x0), sh / BOX.h);
     const viewH = H / k;
     G.D = viewH / 2 / Math.tan((cam.fov * PI) / 360);
-    G.offX = (left + sw / 2 - W / 2) / k;
-    G.offY = (top + sh / 2 - H / 2) / k; // the free area's middle, below the screen's middle by this many metres
     G.viewH = viewH;
     G.freeH = sh / k;
     cam.aspect = W / H;
     cam.near = Math.max(1, G.D * 0.4);
     cam.far = G.D + 140;
-    cam.updateProjectionMatrix();
+    // x = 0 at the free area's middle; the eye line ABOVE metres below the free area's middle
+    cam.setViewOffset(W, H, W / 2 - (left + sw / 2), H / 2 - (top + sh / 2 + ABOVE * k), W, H);
     G.k = k;
-    placeCam(true);
+    placeCam();
   }
-  // where the middle of the free area looks: the courier's floor, kept inside the hotel (and the sky above it)
+  // the eye's height: the courier's floor (or his lift car); the roof while the blimp lowers him; the garage at the end
   function camWant() {
     const w = G.w;
     if (!w) return NF * FH;
-    let y = S.py(w) + 1.4;
-    const sc = G.scene2;
-    if (sc && sc.kind === 'win') y = 1.6;
-    if (w.phase === 'ready' && w.drop) y = NF * FH + 2.5;
-    const lo = -0.6 + G.freeH / 2, hi = NF * FH + 9 - G.freeH / 2;
-    return lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, y));
+    if (G.scene2 && G.scene2.kind === 'win') return 0;
+    if (w.phase === 'ready' && w.drop) return NF * FH;
+    if (w.phase === 'turn' || w.phase === 'over' || w.p.mode === 'gone') return G.camY;
+    return S.py(w);
   }
-  function placeCam(snap, dt) {
-    const want = camWant();
-    if (snap) G.camY = want;
-    else G.camY += (want - G.camY) * (1 - Math.exp(-(dt || DT) * 5));
-    const cx = (BOX.x0 + BOX.x1) / 2 - G.offX, cy = G.camY + G.offY;
-    cam.position.set(cx, cy, G.D);
-    cam.lookAt(cx, cy, 0);
+  function placeCam() {
+    G.camY = camWant();
+    G.midY = G.camY + ABOVE; // the free area's middle, for tests
+    cam.position.set(0, G.camY, G.D);
+    cam.lookAt(0, G.camY, 0);
     cam.updateMatrixWorld();
   }
   function toScreen(x, y, z) {
@@ -317,6 +316,7 @@
     let ud = (held('u') ? 1 : 0) - (held('d') ? 1 : 0);
     let duck = DUCK.some((c) => G.keys[c]) || !!G.touch.duck;
     if (G.sab === 'mirror') lr = -lr; // the play check's own sabotages
+    if (G.sab === 'flipUD') ud = -ud;
     if (G.sab === 'stuckCar' && G.w.p.mode === 'car') { lr = 0; ud = 0; }
     if (G.sab === 'stuckDuck' && G.w.p.duck) duck = true;
     G.taps = {};
@@ -464,7 +464,7 @@
   function showDemoAgain() {
     G.w = newWorld(true);
     G.doorAnim = {};
-    placeCam(true);
+    placeCam();
   }
 
   // ---------- what the rules said happened ----------
@@ -494,6 +494,7 @@
           if (e.by === 'buddy' && e.left > 0 && !here(e.f)) toast(`PARCEL ${e.i + 1} DELIVERED!`);
           break;
         }
+        case 'wrongWay': snd(SFX.nope); pop(e.x, e.f * FH + 2.3, e.goes > 0 ? 'THIS LIFT ONLY GOES UP!' : 'THIS LIFT ONLY GOES DOWN!', 'small'); break;
         case 'notYet': snd(SFX.nope); pop(e.x, e.f * FH + 2.3, `PARCEL ${e.next + 1} FIRST!`, 'small'); break;
         case 'allDone': snd(SFX.allDone); big('ALL PARCELS DELIVERED!', 'NOW RIDE DOWN TO THE GARAGE 🚐'); break;
         case 'vanWait': snd(SFX.honk); pop(w.L.vanX, 2.6, e.left === 1 ? '1 PARCEL LEFT!' : `${e.left} PARCELS LEFT!`, 'small'); break;
@@ -503,7 +504,7 @@
           big('HOTEL DONE!', `BONUS +${fmt(e.bonus)}`);
           confetti.burst(w.p.x, 1.4, 0.6, 70, 5);
           break;
-        case 'building': G.scene2 = null; G.doorAnim = {}; big(LV.NAMES[w.L.index], hotelLine()); placeCam(true); break;
+        case 'building': G.scene2 = null; G.doorAnim = {}; big(LV.NAMES[w.L.index], hotelLine()); placeCam(); break;
         case 'won': snd(SFX.won); big('ALL 5 HOTELS!', 'SUPER COURIER!'); break;
         case 'turn': snd(SFX.turn); big(`${NAME(e.who)}'S TURN!`); setTimeout(setupBud, 0); break;
         case 'out': if (w.two) toast(`${NAME(e.who)} IS OUT OF LIVES`); break;
@@ -624,7 +625,7 @@
     V.van.userData.body.position.y = vanGo ? Math.abs(Math.sin(t * 20)) * 0.04 : 0;
     if (vanGo && !sc.honked) { sc.honked = true; if (!G.demo) SFX.honk(); }
     // the blimp over the roof
-    blimp.position.set(w.L.startX - 0.3 * Math.sign(w.L.startX) + Math.sin(t * 0.4) * 0.3, NF * FH + 7.3 + Math.sin(t * 0.9) * 0.2, -0.6);
+    blimp.position.set(w.L.startX - 0.3 * Math.sign(w.L.startX) + Math.sin(t * 0.4) * 0.3, NF * FH + 6.4 + Math.sin(t * 0.9) * 0.2, -0.6);
     blimp.rotation.y = w.L.startX > 0 ? 0 : PI;
     blimp.userData.prop.rotation.x = t * 20;
     G.cheerT = Math.max(0, G.cheerT - dt);
@@ -636,7 +637,7 @@
     spectators(dt);
     confetti.update(dt);
     if (sc && (sc.kind === 'win' || sc.kind === 'clear') && sc.t < 3 && Math.floor(sc.t * 2) !== Math.floor((sc.t - dt) * 2)) confetti.rain(-8, 8, G.camY + 6, 26);
-    placeCam(false, dt);
+    placeCam();
     hud();
   }
 
@@ -658,18 +659,18 @@
     if (carried.parent !== P.hips) P.hips.add(carried);
     carried.visible = pl.done < w.L.targets.length && p.mode !== 'cheer';
     if (gone) return;
-    let x = p.x, y = S.py(w) + (p.mode === 'car' ? 0.12 : 0), mode = 'stand', ph = 0, want = p.face > 0 ? FACE_R : FACE_L; // in a lift he stands on its floor plate
+    let x = p.x, y = S.py(w), mode = 'stand', ph = 0, want = p.face > 0 ? FACE_R : FACE_L;
     let z = p.mode === 'car' ? Z_CAR : Z_WALK;
     if (w.phase === 'ready' && w.drop) {
       // the blimp lowers him onto the roof on a rope
       const u = Math.min(1, w.phaseT / S.READY);
-      y = NF * FH + (1 - u) * 4.2;
+      y = NF * FH + (1 - u) * 3.3;
       mode = 'jump';
       want = PI;
       const r = blimp.userData.rope;
       r.visible = true;
       blimp.updateMatrixWorld();
-      const top = blimp.worldToLocal(v3.set(x, NF * FH + 5.6, 0.15)).clone();
+      const top = blimp.worldToLocal(v3.set(x, NF * FH + 4.7, 0.15)).clone();
       const bot = blimp.worldToLocal(v3.set(x, y + 1.25, 0.15)).clone();
       r.position.copy(top).add(bot).multiplyScalar(0.5);
       r.scale.y = Math.max(0.01, top.distanceTo(bot));
@@ -967,7 +968,7 @@
       if (o.building != null) { G.w.players.forEach((pl) => { pl.b = o.building; pl.x = null; }); S.loadBuilding(G.w, true); }
       if (o.building != null) big(LV.NAMES[G.w.L.index], hotelLine());
       if (o.go) { G.w.phase = 'play'; G.w.phaseT = 0; G.w.drop = false; }
-      placeCam(true);
+      placeCam();
       return state();
     },
     step(secs, o) {
@@ -988,7 +989,7 @@
       if (p.mode === 'car') { w.cars[p.car].rider = false; }
       p.mode = 'walk'; p.car = -1; p.f = f; p.x = x; p.duck = false; p.inv = 0; p.vx = 0;
       w.lastF = f;
-      placeCam(true);
+      placeCam();
       return state();
     },
     // park lift s's car on floor f with its doors open

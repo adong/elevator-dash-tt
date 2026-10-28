@@ -8,7 +8,8 @@
      out of a lift the way they point; Z and 🙇 duck (and towels fly over); Space and ☁️ toss a pillow the way he faces.
    - nothing leaves him stuck: letting go mid-ride, a lift at the end of its run, ducking, a bump, a key held through
      pause, the brother's visit, the turn passing in 2 players, and a "keyboard kid" mashing keys in every hotel.
-   game.playCheck('mirror'), ('stuckCar') and ('stuckDuck') prove the check fails when the controls are wrong. */
+   - ↓ never goes up: every lift on every hotel, keys and touch, standing or walking in (Alan's bug report).
+   game.playCheck('mirror'), ('flipUD'), ('stuckCar') and ('stuckDuck') prove the check fails when the controls are wrong. */
 (function () {
   'use strict';
   const LV = ED.levels, S = ED.sim, FH = S.FH, NF = S.NF;
@@ -107,6 +108,75 @@
           const outWay = s.x > 0 ? g.sx < e.sx - 20 : g.sx > e.sx + 20;
           ok(`step out hotel ${b + 1} ${how}`, g.mode === 'walk' && g.f === f && outWay, `${s.x > 0 ? '←' : '→'}: ${g.mode} on ${g.f}, ${e.sx}→${g.sx} px`);
         }
+      }
+
+      // ---------- ↓ never goes up (Alan: "when i reach down, and press down, it goes up") ----------
+      // Every hotel, every lift, its lowest, middle and top floor, the car parked low, high or right there, with ArrowDown,
+      // KeyS and the touch ▼, standing at the lift or walking into it with ↓ already held. While ↓ is held: the courier is
+      // never drawn higher, never rises on the screen (the viewport, camera and all, 1 px allowed for rounding), and no
+      // ride goes up. A car below may come up to fetch him, but only because he stands there: the same happens with no key.
+      {
+        const V = () => game.G.views[game.world().L.index];
+        let cases = 0;
+        const bad = { higher: [], screen: [], rideUp: [], keyFetch: [] };
+        for (let b = 0; b < LV.COUNT; b++) {
+          for (const s of LV.build(b).shafts) {
+            for (const f of [...new Set([s.lo, Math.round((s.lo + s.hi) / 2), s.hi])]) {
+              for (const start of [...new Set([s.lo, f, s.hi])]) {
+                for (const how of ['ArrowDown', 'KeyS', 'touch']) {
+                  for (const walkIn of [false, true]) {
+                    const tag = `hotel ${b + 1} lift [${s.lo}-${s.hi}] floor ${f} car on ${start} ${how}${walkIn ? ' walking in' : ''}`;
+                    const trace = (down) => {
+                      fresh(b);
+                      game.put(f, walkIn ? s.x - 2.2 : s.x);
+                      game.park(s.i, start);
+                      step(1 / 60);
+                      const w = game.world();
+                      let a = st().p, wy = a.drawnY, sy = a.sy;
+                      const carY = [];
+                      const hold = (v) => {
+                        if (how === 'touch') { document.body.classList.add('touch'); if (down) (v ? tdown : tup)('d', 31); if (walkIn) (v ? tdown : tup)('r', 32); }
+                        else { if (down) key(how, v); if (walkIn) key('ArrowRight', v); }
+                      };
+                      hold(true);
+                      let walking = walkIn;
+                      for (let i = 0; i < 60 * 6; i++) {
+                        if (walking && (w.p.mode !== 'walk' || w.p.x >= s.x - 0.05)) { if (how === 'touch') tup('r', 32); else key('ArrowRight', false); walking = false; }
+                        const evs = [];
+                        step(1 / 60);
+                        const p = st().p;
+                        carY.push(V().cars[s.i].position.y);
+                        if (down && !walking) {
+                          if (p.drawnY > wy + 1e-6) bad.higher.push(`${tag}: drawn ${wy.toFixed(2)}→${p.drawnY.toFixed(2)} m (${p.mode})`);
+                          if (p.sy < sy - 1) bad.screen.push(`${tag}: ${sy}→${p.sy} px on screen (${p.mode})`);
+                          if (p.mode === 'car' && carY.length > 1 && carY[carY.length - 1] > carY[carY.length - 2] + 1e-6) bad.rideUp.push(`${tag}: rode up`);
+                        }
+                        wy = p.drawnY;
+                        sy = p.sy;
+                      }
+                      if (how === 'touch') { if (down) tup('d', 31); document.body.classList.remove('touch'); } else if (down) key(how, false);
+                      return carY;
+                    };
+                    const withDown = trace(true);
+                    cases++;
+                    if (start < f && how === 'ArrowDown' && !walkIn) {
+                      // the fetch from below: identical with no key held, so ↓ isn't what sends the car up
+                      const noKey = trace(false);
+                      const upTo = withDown.findIndex((y, i) => i > 0 && y < withDown[i - 1] - 1e-6); // until it first starts down with him
+                      const n = upTo < 0 ? withDown.length : upTo;
+                      for (let i = 0; i < n; i++) if (Math.abs(withDown[i] - noKey[i]) > 1e-6) { bad.keyFetch.push(`${tag}: ↓ changed how the car came up`); break; }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        const first = (a) => (a.length ? ` e.g. ${a[0]}` : '');
+        ok('↓ never draws him higher', !bad.higher.length, `${cases} cases, ${bad.higher.length} ticks drawn higher${first(bad.higher)}`);
+        ok('↓ never moves him up the screen', !bad.screen.length, `${cases} cases, ${bad.screen.length} ticks rising on screen${first(bad.screen)}`);
+        ok('↓ never rides up', !bad.rideUp.length, `${bad.rideUp.length} up rides${first(bad.rideUp)}`);
+        ok('↓ does not send a car up', !bad.keyFetch.length, `${bad.keyFetch.length} differences${first(bad.keyFetch)}`);
       }
 
       // ---------- duck and pillow, keys and touch ----------

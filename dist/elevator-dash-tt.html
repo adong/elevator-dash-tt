@@ -2070,6 +2070,7 @@
   const DT = 1 / 60, FH = LV.FH, NF = LV.NF;
   const XL = -9.5, XR = 9.5;
   const IN_R = 0.6; // standing at a lift or a door
+  const CALL_R = 3.5; // walking this close to a lift calls it
   const BUMP_R = 0.72, PILLOW_R = 0.6, TOWEL_R = 0.42;
   const READY = 1.6, TURN_T = 2.4, CLEAR_T = 4.6, STOP = 0.4, EXPRESS = 6, DIZZY = 1.5, SAFE_AFTER = 2.5;
   const BUDDY_INTRO = 1.0, BUDDY_FLY = 1.3, BUDDY_END = BUDDY_INTRO + BUDDY_FLY + 0.8;
@@ -2196,16 +2197,24 @@
       p.pillowCd = 0.32;
       ev(w, 'pillow', { x: p.x, f: p.f, low: p.duck });
     }
-    const s = LV.shaftAt(w.L, p.f, p.x, IN_R);
-    if (!s) return;
-    const c = w.cars[s.i];
-    if (c.at === p.f && c.to < 0) {
-      if (inp.ud && !p.duck) enter(w, c, Math.sign(inp.ud));
-    } else if (c.to !== p.f && !c.rider) {
-      // the lift comes to you (express, no stops)
+    // lifts come to you as you walk up to them (express, no stops), so one is usually waiting when you get there
+    for (const q of w.L.shafts) {
+      if (p.f < q.lo || p.f > q.hi || Math.abs(q.x - p.x) > CALL_R) continue;
+      const c = w.cars[q.i];
+      if (c.rider || c.to === p.f || (c.at === p.f && c.to < 0)) continue;
       c.to = p.f;
       c.at = -1;
       ev(w, 'call', { car: c.i, f: p.f });
+    }
+    const s = LV.shaftAt(w.L, p.f, p.x, IN_R);
+    if (!s) return;
+    const c = w.cars[s.i];
+    if (c.at === p.f && c.to < 0 && inp.ud && !p.duck) {
+      // step in only when the lift goes that way: ↓ on a lift's lowest floor does nothing (he never hops up into a car
+      // that can't take him down); a bubble says which way it goes
+      const ud = Math.sign(inp.ud);
+      if ((p.f + ud >= c.lo && p.f + ud <= c.hi) || SAB === 'wrongWayIn') enter(w, c, ud);
+      else if (w.nag <= 0) { w.nag = 2; ev(w, 'wrongWay', { car: c.i, f: p.f, x: c.x, goes: ud > 0 ? -1 : 1 }); }
     }
   }
   function enter(w, c, ud) {
@@ -2504,7 +2513,7 @@
   }
 
   ED.sim = {
-    DT, FH, NF, XL, XR, IN_R, BUMP_R, READY, TURN_T, CLEAR_T, STOP, BUDDY_INTRO, BUDDY_FLY, BUDDY_END, LEVELS, TREATS,
+    DT, FH, NF, XL, XR, IN_R, CALL_R, BUMP_R, READY, TURN_T, CLEAR_T, STOP, BUDDY_INTRO, BUDDY_FLY, BUDDY_END, LEVELS, TREATS,
     create, loadBuilding, step, call, py, rnd,
     sabotage(s) { SAB = s || null; return SAB; },
   };
@@ -2740,6 +2749,32 @@
         if (w3.p.mode !== 'walk' || w3.p.f !== 1) fails.push(`b${b + 1}: → in a stopped car left you ${w3.p.mode} on ${w3.p.f}`);
       }
       return { ok: !fails.length, info: fails.length ? fails.slice(0, 3).join('; ') : 'all 5 hotels: one tap = one floor, held ↓ stops at every floor, ↑ goes up, ← → step out' };
+    },
+    // Alan's bug: "when i reach down, and press down, it goes up". ↓ only ever takes you down: on a lift's lowest floor it
+    // doesn't put you in a car that can't go down (a bubble says the lift only goes up), and ↑ on its top floor likewise
+    downNeverUp() {
+      const fails = [];
+      let n = 0;
+      for (let b = 0; b < LV.COUNT; b++) {
+        for (const s of LV.build(b).shafts) {
+          for (let f = s.lo; f <= s.hi; f++) {
+            for (const dir of [-1, 1]) {
+              const w = quiet({ building: b });
+              put(w, f, s.x);
+              park(w, s, f);
+              let y = S.py(w), up = false;
+              const e = run(w, 2, (ww) => { const ny = S.py(ww); if (ny * dir < y * dir - 1e-9) up = true; y = ny; return { ud: dir }; });
+              n++;
+              const can = f + dir >= s.lo && f + dir <= s.hi;
+              const name = `b${b + 1} lift [${s.lo}-${s.hi}] floor ${f} ${dir < 0 ? '↓' : '↑'}`;
+              if (up) fails.push(`${name}: went the other way`);
+              if (can && !(w.p.f * dir > f * dir)) fails.push(`${name}: did not ride`);
+              if (!can && (w.p.mode !== 'walk' || !e.some((x) => x.type === 'wrongWay'))) fails.push(`${name}: ${w.p.mode}, no "only goes ${dir < 0 ? 'up' : 'down'}" bubble`);
+            }
+          }
+        }
+      }
+      return { ok: !fails.length, info: fails.length ? fails.slice(0, 3).join('; ') : `${n} lift stops × ↓ and ↑: never the other way; on a lift's end floor the key leaves you walking with a bubble saying which way it goes` };
     },
     // the lift comes to you
     liftComes() {
@@ -3058,6 +3093,7 @@
 
   // each sabotage breaks one rule; fail() proves a check catches it
   const SABOTAGES = [
+    ['wrongWayIn', '↓ on a lift\'s lowest floor still puts you in the car', 'downNeverUp'],
     ['noStop', 'held ↓ rides past floors without stopping', 'liftsCarry'],
     ['shaftFall', 'a lift with its car away is a hole', 'neverFall'],
     ['midStop', 'letting go stops the car between floors', 'neverStuck'],
@@ -3263,7 +3299,8 @@
   A.backdrop = function (scene) {
     const b = builder();
     // grass, the pavement and the street in front of the hotel
-    b.box(-140, 140, -2, -0.02, -90, ZF + 0.5, mat('#86d66b', { roughness: 1 }));
+    b.box(-140, 140, -40, -0.02, -90, ZF + 0.5, mat('#86d66b', { roughness: 1 }));
+    b.box(-140, 140, -40, -0.42, ZF + 0.5, ZF + 9, mat('#7a5a3a', { roughness: 1 })); // the earth under the street
     b.box(-140, 140, -0.3, -0.01, ZF - 0.1, ZF + 2.4, mat('#d9dee8', { roughness: 1 }));
     b.box(-140, 140, -0.4, -0.015, ZF + 2.4, ZF + 9, mat('#5b6275', { roughness: 1 }));
     for (let x = -130; x < 140; x += 6) b.box(x, x + 3, -0.01, 0.005, ZF + 5.4, ZF + 5.7, mat('#ffffff', { roughness: 1 }));
@@ -3430,7 +3467,7 @@
     const cars = L.shafts.map((s) => {
       const parts = [];
       const add = (w, h, d, x, y, z) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d)); m.position.set(x, y, z); parts.push(m); };
-      add(1.8, 0.12, 1.2, 0, 0.06, 0);
+      add(1.8, 0.12, 1.2, 0, -0.06, 0); // the floor, flush with the corridor: stepping in is level
       add(1.8, 0.1, 1.2, 0, 2.3, 0);
       add(1.8, 2.3, 0.06, 0, 1.15, -0.6);
       add(0.08, 2.3, 1.2, -0.88, 1.15, 0);
@@ -3871,8 +3908,12 @@
     requestAnimationFrame(frame);
   }
 
-  // ---------- the fixed side-on camera: the hotel's full width, about 4½ floors high, gliding with the courier ----------
-  const BOX = { x0: -11.2, x1: 11.2, h: 13.6 };
+  // ---------- the fixed side-on camera: the hotel's full width, about 4½ floors high ----------
+  // The camera's eye stays level with the courier's feet and moves with him, floor for floor, with no lag; a lens shift
+  // (setViewOffset) puts him in the lower middle of the free part of the screen. So riding down never makes him drift
+  // back up the screen when the lift stops, and stepping back into a lift (further from the camera) can't lift him on
+  // screen either: things level with the eye stay on the same screen line however far away they are.
+  const BOX = { x0: -11.2, x1: 11.2, h: 13.6 }, ABOVE = 1.4;
   function fit() {
     const W = innerWidth, H = innerHeight;
     renderer.setSize(W, H, false);
@@ -3891,35 +3932,30 @@
     const k = Math.min(sw / (BOX.x1 - BOX.x0), sh / BOX.h);
     const viewH = H / k;
     G.D = viewH / 2 / Math.tan((cam.fov * PI) / 360);
-    G.offX = (left + sw / 2 - W / 2) / k;
-    G.offY = (top + sh / 2 - H / 2) / k; // the free area's middle, below the screen's middle by this many metres
     G.viewH = viewH;
     G.freeH = sh / k;
     cam.aspect = W / H;
     cam.near = Math.max(1, G.D * 0.4);
     cam.far = G.D + 140;
-    cam.updateProjectionMatrix();
+    // x = 0 at the free area's middle; the eye line ABOVE metres below the free area's middle
+    cam.setViewOffset(W, H, W / 2 - (left + sw / 2), H / 2 - (top + sh / 2 + ABOVE * k), W, H);
     G.k = k;
-    placeCam(true);
+    placeCam();
   }
-  // where the middle of the free area looks: the courier's floor, kept inside the hotel (and the sky above it)
+  // the eye's height: the courier's floor (or his lift car); the roof while the blimp lowers him; the garage at the end
   function camWant() {
     const w = G.w;
     if (!w) return NF * FH;
-    let y = S.py(w) + 1.4;
-    const sc = G.scene2;
-    if (sc && sc.kind === 'win') y = 1.6;
-    if (w.phase === 'ready' && w.drop) y = NF * FH + 2.5;
-    const lo = -0.6 + G.freeH / 2, hi = NF * FH + 9 - G.freeH / 2;
-    return lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, y));
+    if (G.scene2 && G.scene2.kind === 'win') return 0;
+    if (w.phase === 'ready' && w.drop) return NF * FH;
+    if (w.phase === 'turn' || w.phase === 'over' || w.p.mode === 'gone') return G.camY;
+    return S.py(w);
   }
-  function placeCam(snap, dt) {
-    const want = camWant();
-    if (snap) G.camY = want;
-    else G.camY += (want - G.camY) * (1 - Math.exp(-(dt || DT) * 5));
-    const cx = (BOX.x0 + BOX.x1) / 2 - G.offX, cy = G.camY + G.offY;
-    cam.position.set(cx, cy, G.D);
-    cam.lookAt(cx, cy, 0);
+  function placeCam() {
+    G.camY = camWant();
+    G.midY = G.camY + ABOVE; // the free area's middle, for tests
+    cam.position.set(0, G.camY, G.D);
+    cam.lookAt(0, G.camY, 0);
     cam.updateMatrixWorld();
   }
   function toScreen(x, y, z) {
@@ -4067,6 +4103,7 @@
     let ud = (held('u') ? 1 : 0) - (held('d') ? 1 : 0);
     let duck = DUCK.some((c) => G.keys[c]) || !!G.touch.duck;
     if (G.sab === 'mirror') lr = -lr; // the play check's own sabotages
+    if (G.sab === 'flipUD') ud = -ud;
     if (G.sab === 'stuckCar' && G.w.p.mode === 'car') { lr = 0; ud = 0; }
     if (G.sab === 'stuckDuck' && G.w.p.duck) duck = true;
     G.taps = {};
@@ -4214,7 +4251,7 @@
   function showDemoAgain() {
     G.w = newWorld(true);
     G.doorAnim = {};
-    placeCam(true);
+    placeCam();
   }
 
   // ---------- what the rules said happened ----------
@@ -4244,6 +4281,7 @@
           if (e.by === 'buddy' && e.left > 0 && !here(e.f)) toast(`PARCEL ${e.i + 1} DELIVERED!`);
           break;
         }
+        case 'wrongWay': snd(SFX.nope); pop(e.x, e.f * FH + 2.3, e.goes > 0 ? 'THIS LIFT ONLY GOES UP!' : 'THIS LIFT ONLY GOES DOWN!', 'small'); break;
         case 'notYet': snd(SFX.nope); pop(e.x, e.f * FH + 2.3, `PARCEL ${e.next + 1} FIRST!`, 'small'); break;
         case 'allDone': snd(SFX.allDone); big('ALL PARCELS DELIVERED!', 'NOW RIDE DOWN TO THE GARAGE 🚐'); break;
         case 'vanWait': snd(SFX.honk); pop(w.L.vanX, 2.6, e.left === 1 ? '1 PARCEL LEFT!' : `${e.left} PARCELS LEFT!`, 'small'); break;
@@ -4253,7 +4291,7 @@
           big('HOTEL DONE!', `BONUS +${fmt(e.bonus)}`);
           confetti.burst(w.p.x, 1.4, 0.6, 70, 5);
           break;
-        case 'building': G.scene2 = null; G.doorAnim = {}; big(LV.NAMES[w.L.index], hotelLine()); placeCam(true); break;
+        case 'building': G.scene2 = null; G.doorAnim = {}; big(LV.NAMES[w.L.index], hotelLine()); placeCam(); break;
         case 'won': snd(SFX.won); big('ALL 5 HOTELS!', 'SUPER COURIER!'); break;
         case 'turn': snd(SFX.turn); big(`${NAME(e.who)}'S TURN!`); setTimeout(setupBud, 0); break;
         case 'out': if (w.two) toast(`${NAME(e.who)} IS OUT OF LIVES`); break;
@@ -4374,7 +4412,7 @@
     V.van.userData.body.position.y = vanGo ? Math.abs(Math.sin(t * 20)) * 0.04 : 0;
     if (vanGo && !sc.honked) { sc.honked = true; if (!G.demo) SFX.honk(); }
     // the blimp over the roof
-    blimp.position.set(w.L.startX - 0.3 * Math.sign(w.L.startX) + Math.sin(t * 0.4) * 0.3, NF * FH + 7.3 + Math.sin(t * 0.9) * 0.2, -0.6);
+    blimp.position.set(w.L.startX - 0.3 * Math.sign(w.L.startX) + Math.sin(t * 0.4) * 0.3, NF * FH + 6.4 + Math.sin(t * 0.9) * 0.2, -0.6);
     blimp.rotation.y = w.L.startX > 0 ? 0 : PI;
     blimp.userData.prop.rotation.x = t * 20;
     G.cheerT = Math.max(0, G.cheerT - dt);
@@ -4386,7 +4424,7 @@
     spectators(dt);
     confetti.update(dt);
     if (sc && (sc.kind === 'win' || sc.kind === 'clear') && sc.t < 3 && Math.floor(sc.t * 2) !== Math.floor((sc.t - dt) * 2)) confetti.rain(-8, 8, G.camY + 6, 26);
-    placeCam(false, dt);
+    placeCam();
     hud();
   }
 
@@ -4408,18 +4446,18 @@
     if (carried.parent !== P.hips) P.hips.add(carried);
     carried.visible = pl.done < w.L.targets.length && p.mode !== 'cheer';
     if (gone) return;
-    let x = p.x, y = S.py(w) + (p.mode === 'car' ? 0.12 : 0), mode = 'stand', ph = 0, want = p.face > 0 ? FACE_R : FACE_L; // in a lift he stands on its floor plate
+    let x = p.x, y = S.py(w), mode = 'stand', ph = 0, want = p.face > 0 ? FACE_R : FACE_L;
     let z = p.mode === 'car' ? Z_CAR : Z_WALK;
     if (w.phase === 'ready' && w.drop) {
       // the blimp lowers him onto the roof on a rope
       const u = Math.min(1, w.phaseT / S.READY);
-      y = NF * FH + (1 - u) * 4.2;
+      y = NF * FH + (1 - u) * 3.3;
       mode = 'jump';
       want = PI;
       const r = blimp.userData.rope;
       r.visible = true;
       blimp.updateMatrixWorld();
-      const top = blimp.worldToLocal(v3.set(x, NF * FH + 5.6, 0.15)).clone();
+      const top = blimp.worldToLocal(v3.set(x, NF * FH + 4.7, 0.15)).clone();
       const bot = blimp.worldToLocal(v3.set(x, y + 1.25, 0.15)).clone();
       r.position.copy(top).add(bot).multiplyScalar(0.5);
       r.scale.y = Math.max(0.01, top.distanceTo(bot));
@@ -4717,7 +4755,7 @@
       if (o.building != null) { G.w.players.forEach((pl) => { pl.b = o.building; pl.x = null; }); S.loadBuilding(G.w, true); }
       if (o.building != null) big(LV.NAMES[G.w.L.index], hotelLine());
       if (o.go) { G.w.phase = 'play'; G.w.phaseT = 0; G.w.drop = false; }
-      placeCam(true);
+      placeCam();
       return state();
     },
     step(secs, o) {
@@ -4738,7 +4776,7 @@
       if (p.mode === 'car') { w.cars[p.car].rider = false; }
       p.mode = 'walk'; p.car = -1; p.f = f; p.x = x; p.duck = false; p.inv = 0; p.vx = 0;
       w.lastF = f;
-      placeCam(true);
+      placeCam();
       return state();
     },
     // park lift s's car on floor f with its doors open
@@ -4771,7 +4809,8 @@
      out of a lift the way they point; Z and 🙇 duck (and towels fly over); Space and ☁️ toss a pillow the way he faces.
    - nothing leaves him stuck: letting go mid-ride, a lift at the end of its run, ducking, a bump, a key held through
      pause, the brother's visit, the turn passing in 2 players, and a "keyboard kid" mashing keys in every hotel.
-   game.playCheck('mirror'), ('stuckCar') and ('stuckDuck') prove the check fails when the controls are wrong. */
+   - ↓ never goes up: every lift on every hotel, keys and touch, standing or walking in (Alan's bug report).
+   game.playCheck('mirror'), ('flipUD'), ('stuckCar') and ('stuckDuck') prove the check fails when the controls are wrong. */
 (function () {
   'use strict';
   const LV = ED.levels, S = ED.sim, FH = S.FH, NF = S.NF;
@@ -4870,6 +4909,75 @@
           const outWay = s.x > 0 ? g.sx < e.sx - 20 : g.sx > e.sx + 20;
           ok(`step out hotel ${b + 1} ${how}`, g.mode === 'walk' && g.f === f && outWay, `${s.x > 0 ? '←' : '→'}: ${g.mode} on ${g.f}, ${e.sx}→${g.sx} px`);
         }
+      }
+
+      // ---------- ↓ never goes up (Alan: "when i reach down, and press down, it goes up") ----------
+      // Every hotel, every lift, its lowest, middle and top floor, the car parked low, high or right there, with ArrowDown,
+      // KeyS and the touch ▼, standing at the lift or walking into it with ↓ already held. While ↓ is held: the courier is
+      // never drawn higher, never rises on the screen (the viewport, camera and all, 1 px allowed for rounding), and no
+      // ride goes up. A car below may come up to fetch him, but only because he stands there: the same happens with no key.
+      {
+        const V = () => game.G.views[game.world().L.index];
+        let cases = 0;
+        const bad = { higher: [], screen: [], rideUp: [], keyFetch: [] };
+        for (let b = 0; b < LV.COUNT; b++) {
+          for (const s of LV.build(b).shafts) {
+            for (const f of [...new Set([s.lo, Math.round((s.lo + s.hi) / 2), s.hi])]) {
+              for (const start of [...new Set([s.lo, f, s.hi])]) {
+                for (const how of ['ArrowDown', 'KeyS', 'touch']) {
+                  for (const walkIn of [false, true]) {
+                    const tag = `hotel ${b + 1} lift [${s.lo}-${s.hi}] floor ${f} car on ${start} ${how}${walkIn ? ' walking in' : ''}`;
+                    const trace = (down) => {
+                      fresh(b);
+                      game.put(f, walkIn ? s.x - 2.2 : s.x);
+                      game.park(s.i, start);
+                      step(1 / 60);
+                      const w = game.world();
+                      let a = st().p, wy = a.drawnY, sy = a.sy;
+                      const carY = [];
+                      const hold = (v) => {
+                        if (how === 'touch') { document.body.classList.add('touch'); if (down) (v ? tdown : tup)('d', 31); if (walkIn) (v ? tdown : tup)('r', 32); }
+                        else { if (down) key(how, v); if (walkIn) key('ArrowRight', v); }
+                      };
+                      hold(true);
+                      let walking = walkIn;
+                      for (let i = 0; i < 60 * 6; i++) {
+                        if (walking && (w.p.mode !== 'walk' || w.p.x >= s.x - 0.05)) { if (how === 'touch') tup('r', 32); else key('ArrowRight', false); walking = false; }
+                        const evs = [];
+                        step(1 / 60);
+                        const p = st().p;
+                        carY.push(V().cars[s.i].position.y);
+                        if (down && !walking) {
+                          if (p.drawnY > wy + 1e-6) bad.higher.push(`${tag}: drawn ${wy.toFixed(2)}→${p.drawnY.toFixed(2)} m (${p.mode})`);
+                          if (p.sy < sy - 1) bad.screen.push(`${tag}: ${sy}→${p.sy} px on screen (${p.mode})`);
+                          if (p.mode === 'car' && carY.length > 1 && carY[carY.length - 1] > carY[carY.length - 2] + 1e-6) bad.rideUp.push(`${tag}: rode up`);
+                        }
+                        wy = p.drawnY;
+                        sy = p.sy;
+                      }
+                      if (how === 'touch') { if (down) tup('d', 31); document.body.classList.remove('touch'); } else if (down) key(how, false);
+                      return carY;
+                    };
+                    const withDown = trace(true);
+                    cases++;
+                    if (start < f && how === 'ArrowDown' && !walkIn) {
+                      // the fetch from below: identical with no key held, so ↓ isn't what sends the car up
+                      const noKey = trace(false);
+                      const upTo = withDown.findIndex((y, i) => i > 0 && y < withDown[i - 1] - 1e-6); // until it first starts down with him
+                      const n = upTo < 0 ? withDown.length : upTo;
+                      for (let i = 0; i < n; i++) if (Math.abs(withDown[i] - noKey[i]) > 1e-6) { bad.keyFetch.push(`${tag}: ↓ changed how the car came up`); break; }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        const first = (a) => (a.length ? ` e.g. ${a[0]}` : '');
+        ok('↓ never draws him higher', !bad.higher.length, `${cases} cases, ${bad.higher.length} ticks drawn higher${first(bad.higher)}`);
+        ok('↓ never moves him up the screen', !bad.screen.length, `${cases} cases, ${bad.screen.length} ticks rising on screen${first(bad.screen)}`);
+        ok('↓ never rides up', !bad.rideUp.length, `${bad.rideUp.length} up rides${first(bad.rideUp)}`);
+        ok('↓ does not send a car up', !bad.keyFetch.length, `${bad.keyFetch.length} differences${first(bad.keyFetch)}`);
       }
 
       // ---------- duck and pillow, keys and touch ----------
@@ -5088,7 +5196,7 @@ Kit.help.setup({
     'ALL PARCELS DELIVERED!': '包裹全送到啦！', 'NOW RIDE DOWN TO THE GARAGE 🚐': '快坐电梯下到车库 🚐',
     'HOTEL DONE!': '酒店完成！', 'ALL 5 HOTELS!': '5 家酒店全送完！', 'SUPER COURIER!': '超级快递员！',
     'BOING! +100': '咚！+100', 'SORRY!': '对不起！', 'WHOOSH! +50': '嗖！+50', 'FLUMP!': '噗！', 'OOF!': '哎哟！',
-    'THANK YOU! +500': '谢谢你！+500', '1 PARCEL LEFT!': '还剩 1 个包裹！', 'EXTRA LIFE!': '多一条命！',
+    'THANK YOU! +500': '谢谢你！+500', 'THIS LIFT ONLY GOES UP!': '这部电梯只往上！', 'THIS LIFT ONLY GOES DOWN!': '这部电梯只往下！', '1 PARCEL LEFT!': '还剩 1 个包裹！', 'EXTRA LIFE!': '多一条命！',
     'HIGH FIVE! ✋ +50': '击掌！✋ +50',
     // pause, results
     'P · Esc · Space to go on · Q for the menu · M sound': 'P · Esc · 空格 继续 · Q 回菜单 · M 声音',

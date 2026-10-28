@@ -26,7 +26,7 @@
     'ALL PARCELS DELIVERED!': '包裹全送到啦！', 'NOW RIDE DOWN TO THE GARAGE 🚐': '快坐电梯下到车库 🚐',
     'HOTEL DONE!': '酒店完成！', 'ALL 5 HOTELS!': '5 家酒店全送完！', 'SUPER COURIER!': '超级快递员！',
     'BOING! +100': '咚！+100', 'SORRY!': '对不起！', 'WHOOSH! +50': '嗖！+50', 'FLUMP!': '噗！', 'OOF!': '哎哟！',
-    'THANK YOU! +500': '谢谢你！+500', '1 PARCEL LEFT!': '还剩 1 个包裹！', 'EXTRA LIFE!': '多一条命！',
+    'THANK YOU! +500': '谢谢你！+500', 'THIS LIFT ONLY GOES UP!': '这部电梯只往上！', 'THIS LIFT ONLY GOES DOWN!': '这部电梯只往下！', '1 PARCEL LEFT!': '还剩 1 个包裹！', 'EXTRA LIFE!': '多一条命！',
     'HIGH FIVE! ✋ +50': '击掌！✋ +50',
     // pause, results
     'P · Esc · Space to go on · Q for the menu · M sound': 'P · Esc · 空格 继续 · Q 回菜单 · M 声音',

@@ -45,6 +45,11 @@
   "shot": "zh-vanwait"
  },
  {
+  "label": "lift only goes up",
+  "js": "(() => { game.quiet(); const s = game.world().L.shafts[0]; game.put(s.lo, s.x); game.park(s.i, s.lo); dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowDown'})); game.step(0.3); dispatchEvent(new KeyboardEvent('keyup',{code:'ArrowDown'})); return new Promise(r => setTimeout(() => r(JSON.stringify([game.state().p.mode, Kit.lang.untranslated()])), 300)); })()",
+  "shot": "zh-wrongway"
+ },
+ {
   "label": "clear",
   "js": "(() => { const w = game.world(); w.players[0].done = w.L.targets.length; game.put(0, w.L.vanX - 2); dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowRight'})); game.step(0.8); dispatchEvent(new KeyboardEvent('keyup',{code:'ArrowRight'})); game.step(0.4); return new Promise(r => setTimeout(() => r(JSON.stringify([game.state().phase, Kit.lang.untranslated()])), 300)); })()",
   "shot": "zh-clear"

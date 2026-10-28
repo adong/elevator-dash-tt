@@ -14,6 +14,7 @@
   const DT = 1 / 60, FH = LV.FH, NF = LV.NF;
   const XL = -9.5, XR = 9.5;
   const IN_R = 0.6; // standing at a lift or a door
+  const CALL_R = 3.5; // walking this close to a lift calls it
   const BUMP_R = 0.72, PILLOW_R = 0.6, TOWEL_R = 0.42;
   const READY = 1.6, TURN_T = 2.4, CLEAR_T = 4.6, STOP = 0.4, EXPRESS = 6, DIZZY = 1.5, SAFE_AFTER = 2.5;
   const BUDDY_INTRO = 1.0, BUDDY_FLY = 1.3, BUDDY_END = BUDDY_INTRO + BUDDY_FLY + 0.8;
@@ -140,16 +141,24 @@
       p.pillowCd = 0.32;
       ev(w, 'pillow', { x: p.x, f: p.f, low: p.duck });
     }
-    const s = LV.shaftAt(w.L, p.f, p.x, IN_R);
-    if (!s) return;
-    const c = w.cars[s.i];
-    if (c.at === p.f && c.to < 0) {
-      if (inp.ud && !p.duck) enter(w, c, Math.sign(inp.ud));
-    } else if (c.to !== p.f && !c.rider) {
-      // the lift comes to you (express, no stops)
+    // lifts come to you as you walk up to them (express, no stops), so one is usually waiting when you get there
+    for (const q of w.L.shafts) {
+      if (p.f < q.lo || p.f > q.hi || Math.abs(q.x - p.x) > CALL_R) continue;
+      const c = w.cars[q.i];
+      if (c.rider || c.to === p.f || (c.at === p.f && c.to < 0)) continue;
       c.to = p.f;
       c.at = -1;
       ev(w, 'call', { car: c.i, f: p.f });
+    }
+    const s = LV.shaftAt(w.L, p.f, p.x, IN_R);
+    if (!s) return;
+    const c = w.cars[s.i];
+    if (c.at === p.f && c.to < 0 && inp.ud && !p.duck) {
+      // step in only when the lift goes that way: ↓ on a lift's lowest floor does nothing (he never hops up into a car
+      // that can't take him down); a bubble says which way it goes
+      const ud = Math.sign(inp.ud);
+      if ((p.f + ud >= c.lo && p.f + ud <= c.hi) || SAB === 'wrongWayIn') enter(w, c, ud);
+      else if (w.nag <= 0) { w.nag = 2; ev(w, 'wrongWay', { car: c.i, f: p.f, x: c.x, goes: ud > 0 ? -1 : 1 }); }
     }
   }
   function enter(w, c, ud) {
@@ -448,7 +457,7 @@
   }
 
   ED.sim = {
-    DT, FH, NF, XL, XR, IN_R, BUMP_R, READY, TURN_T, CLEAR_T, STOP, BUDDY_INTRO, BUDDY_FLY, BUDDY_END, LEVELS, TREATS,
+    DT, FH, NF, XL, XR, IN_R, CALL_R, BUMP_R, READY, TURN_T, CLEAR_T, STOP, BUDDY_INTRO, BUDDY_FLY, BUDDY_END, LEVELS, TREATS,
     create, loadBuilding, step, call, py, rnd,
     sabotage(s) { SAB = s || null; return SAB; },
   };

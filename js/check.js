@@ -126,6 +126,32 @@
       }
       return { ok: !fails.length, info: fails.length ? fails.slice(0, 3).join('; ') : 'all 5 hotels: one tap = one floor, held ↓ stops at every floor, ↑ goes up, ← → step out' };
     },
+    // Alan's bug: "when i reach down, and press down, it goes up". ↓ only ever takes you down: on a lift's lowest floor it
+    // doesn't put you in a car that can't go down (a bubble says the lift only goes up), and ↑ on its top floor likewise
+    downNeverUp() {
+      const fails = [];
+      let n = 0;
+      for (let b = 0; b < LV.COUNT; b++) {
+        for (const s of LV.build(b).shafts) {
+          for (let f = s.lo; f <= s.hi; f++) {
+            for (const dir of [-1, 1]) {
+              const w = quiet({ building: b });
+              put(w, f, s.x);
+              park(w, s, f);
+              let y = S.py(w), up = false;
+              const e = run(w, 2, (ww) => { const ny = S.py(ww); if (ny * dir < y * dir - 1e-9) up = true; y = ny; return { ud: dir }; });
+              n++;
+              const can = f + dir >= s.lo && f + dir <= s.hi;
+              const name = `b${b + 1} lift [${s.lo}-${s.hi}] floor ${f} ${dir < 0 ? '↓' : '↑'}`;
+              if (up) fails.push(`${name}: went the other way`);
+              if (can && !(w.p.f * dir > f * dir)) fails.push(`${name}: did not ride`);
+              if (!can && (w.p.mode !== 'walk' || !e.some((x) => x.type === 'wrongWay'))) fails.push(`${name}: ${w.p.mode}, no "only goes ${dir < 0 ? 'up' : 'down'}" bubble`);
+            }
+          }
+        }
+      }
+      return { ok: !fails.length, info: fails.length ? fails.slice(0, 3).join('; ') : `${n} lift stops × ↓ and ↑: never the other way; on a lift's end floor the key leaves you walking with a bubble saying which way it goes` };
+    },
     // the lift comes to you
     liftComes() {
       const fails = [];
@@ -443,6 +469,7 @@
 
   // each sabotage breaks one rule; fail() proves a check catches it
   const SABOTAGES = [
+    ['wrongWayIn', '↓ on a lift\'s lowest floor still puts you in the car', 'downNeverUp'],
     ['noStop', 'held ↓ rides past floors without stopping', 'liftsCarry'],
     ['shaftFall', 'a lift with its car away is a hole', 'neverFall'],
     ['midStop', 'letting go stops the car between floors', 'neverStuck'],

@@ -170,7 +170,8 @@
   A.backdrop = function (scene) {
     const b = builder();
     // grass, the pavement and the street in front of the hotel
-    b.box(-140, 140, -2, -0.02, -90, ZF + 0.5, mat('#86d66b', { roughness: 1 }));
+    b.box(-140, 140, -40, -0.02, -90, ZF + 0.5, mat('#86d66b', { roughness: 1 }));
+    b.box(-140, 140, -40, -0.42, ZF + 0.5, ZF + 9, mat('#7a5a3a', { roughness: 1 })); // the earth under the street
     b.box(-140, 140, -0.3, -0.01, ZF - 0.1, ZF + 2.4, mat('#d9dee8', { roughness: 1 }));
     b.box(-140, 140, -0.4, -0.015, ZF + 2.4, ZF + 9, mat('#5b6275', { roughness: 1 }));
     for (let x = -130; x < 140; x += 6) b.box(x, x + 3, -0.01, 0.005, ZF + 5.4, ZF + 5.7, mat('#ffffff', { roughness: 1 }));
@@ -337,7 +338,7 @@
     const cars = L.shafts.map((s) => {
       const parts = [];
       const add = (w, h, d, x, y, z) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d)); m.position.set(x, y, z); parts.push(m); };
-      add(1.8, 0.12, 1.2, 0, 0.06, 0);
+      add(1.8, 0.12, 1.2, 0, -0.06, 0); // the floor, flush with the corridor: stepping in is level
       add(1.8, 0.1, 1.2, 0, 2.3, 0);
       add(1.8, 2.3, 0.06, 0, 1.15, -0.6);
       add(0.08, 2.3, 1.2, -0.88, 1.15, 0);
