@@ -288,9 +288,9 @@
       if (f === 0) for (let px = -7; px <= 7; px += 3.5) b.box(px - 0.06, px + 0.06, y0, y0 + 0.015, -0.9, 0.9, mat('#ffffff', { roughness: 1 }));
     }
     // the outside walls, up to the roof
-    b.box(-OUT, -XW, -0.35, NF * FH, ZB - 0.3, ZF, outerM);
-    b.box(XW, OUT, -0.35, NF * FH, ZB - 0.3, ZF, outerM);
-    b.box(-OUT, OUT, -0.35, NF * FH, ZB - 0.32, ZB - 0.3, outerM);
+    b.box(-OUT, -XW, -0.35, NF * FH, -3.05, ZF, outerM);
+    b.box(XW, OUT, -0.35, NF * FH, -3.05, ZF, outerM);
+    b.box(-OUT, OUT, -0.35, NF * FH, -3.05, -2.95, outerM); // the hotel's back, behind the lift shafts
     for (let f = 1; f <= NF; f++) b.box(-OUT - 0.15, OUT + 0.15, f * FH - 0.45, f * FH - 0.3, ZF - 0.05, ZF + 0.12, mat(G.shade(P.floor, -0.25), { roughness: 0.7 }));
 
     // the lift shafts: a coloured recess in the back wall, rails, a frame and a header on every floor it stops at
@@ -512,10 +512,10 @@
   A.pillow = function () {
     const g = new T.Group();
     const m = new T.Mesh(new T.SphereGeometry(0.3, 14, 10), mat('#ffffff', { roughness: 0.9 }));
-    m.scale.set(1.25, 0.62, 0.95);
+    m.scale.set(1.6, 0.55, 1.1);
     g.add(m);
     const band = new T.Mesh(new T.TorusGeometry(0.27, 0.025, 6, 20), mat('#7ec8ff'));
-    band.scale.set(1.3, 0.62, 1);
+    band.scale.set(1.75, 0.55, 1);
     g.add(band);
     return g;
   };

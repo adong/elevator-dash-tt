@@ -1,0 +1,96 @@
+[
+ {
+  "label": "muted zh",
+  "js": "localStorage.setItem('claudeGames.muted', '1'); localStorage.setItem('claudeGames.lang', 'zh'); location.reload(); 'reload'",
+  "wait": 5000
+ },
+ {
+  "label": "title",
+  "js": "game.hold(true); game.step(1); new Promise(r => setTimeout(() => r(JSON.stringify(Kit.lang.untranslated())), 300))",
+  "shot": "zh-title"
+ },
+ {
+  "label": "help",
+  "js": "Kit.help.open(); new Promise(r => setTimeout(() => { const u = Kit.lang.untranslated(); Kit.help.close(); r(JSON.stringify(u)); }, 300))",
+  "shot": "zh-help"
+ },
+ {
+  "label": "play (roof)",
+  "js": "game.start({level:'easy'}); game.step(0.5); new Promise(r => setTimeout(() => r(JSON.stringify(Kit.lang.untranslated())), 300))",
+  "shot": "zh-roof"
+ },
+ {
+  "label": "buddy",
+  "js": "game.step(1.5); game.call(); game.step(1.2); new Promise(r => setTimeout(() => r(JSON.stringify(Kit.lang.untranslated())), 300))",
+  "shot": "zh-buddy"
+ },
+ {
+  "label": "pops",
+  "js": "(() => { game.step(2); game.quiet(); const w = game.world(); const T = w.L.targets; game.put(T[2].f, T[2].x); game.step(0.2); w.robots.push({id:950,f:T[2].f,x:T[2].x+3,home:3,face:-1,st:'walk',t:0,throwCd:9,thrower:false}); dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowRight'})); game.step(0.1); dispatchEvent(new KeyboardEvent('keyup',{code:'ArrowRight'})); dispatchEvent(new KeyboardEvent('keydown',{code:'Space'})); game.step(0.3); dispatchEvent(new KeyboardEvent('keyup',{code:'Space'})); return new Promise(r => setTimeout(() => r(JSON.stringify(Kit.lang.untranslated())), 200)); })()",
+  "shot": "zh-pops"
+ },
+ {
+  "label": "pause",
+  "js": "game.pause(); new Promise(r => setTimeout(() => r(JSON.stringify(Kit.lang.untranslated())), 300))",
+  "shot": "zh-pause"
+ },
+ {
+  "label": "all done + garage",
+  "js": "(() => { game.resume(); const w = game.world(); w.players[0].done = w.L.targets.length - 1; const T = w.L.targets[w.L.targets.length - 1]; game.put(T.f, T.x); game.step(0.3); game.put(0, 0); game.step(0.3); return new Promise(r => setTimeout(() => r(JSON.stringify(Kit.lang.untranslated())), 300)); })()",
+  "shot": "zh-alldone"
+ },
+ {
+  "label": "van wait",
+  "js": "(() => { game.start({level:'normal', go:true}); game.quiet(); const w = game.world(); game.put(0, w.L.vanX); game.step(0.3); return new Promise(r => setTimeout(() => r(JSON.stringify(Kit.lang.untranslated())), 300)); })()",
+  "shot": "zh-vanwait"
+ },
+ {
+  "label": "clear",
+  "js": "(() => { const w = game.world(); w.players[0].done = w.L.targets.length; game.put(0, w.L.vanX - 2); dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowRight'})); game.step(0.8); dispatchEvent(new KeyboardEvent('keyup',{code:'ArrowRight'})); game.step(0.4); return new Promise(r => setTimeout(() => r(JSON.stringify([game.state().phase, Kit.lang.untranslated()])), 300)); })()",
+  "shot": "zh-clear"
+ },
+ {
+  "label": "next hotel",
+  "js": "game.step(5); new Promise(r => setTimeout(() => r(JSON.stringify([game.state().b, Kit.lang.untranslated()])), 300))",
+  "shot": "zh-hotel2"
+ },
+ {
+  "label": "towel + dodge + bump",
+  "js": "(() => { game.step(2); game.quiet(); const w = game.world(); game.put(6, 0); w.towels.push({x:3,f:6,vx:-5.2,t:0,y:1.05}); dispatchEvent(new KeyboardEvent('keydown',{code:'KeyZ'})); game.step(1); dispatchEvent(new KeyboardEvent('keyup',{code:'KeyZ'})); w.robots.push({id:951,f:6,x:0.3,home:3,face:-1,st:'walk',t:0,throwCd:9,thrower:false}); game.step(0.4); return new Promise(r => setTimeout(() => r(JSON.stringify(Kit.lang.untranslated())), 200)); })()",
+  "shot": "zh-bump"
+ },
+ {
+  "label": "2P turn",
+  "js": "(() => { game.start({players:2, go:true}); game.quiet(); const w = game.world(); game.put(9, 0); w.robots.push({id:952,f:9,x:0.3,home:3,face:-1,st:'walk',t:0,throwCd:9,thrower:false}); game.step(2.2); return new Promise(r => setTimeout(() => r(JSON.stringify([game.state().phase, Kit.lang.untranslated()])), 300)); })()",
+  "shot": "zh-turn"
+ },
+ {
+  "label": "2P hi5",
+  "js": "game.step(4); game.call(); game.step(0.6); new Promise(r => setTimeout(() => r(JSON.stringify(Kit.lang.untranslated())), 300))",
+  "shot": "zh-hi5"
+ },
+ {
+  "label": "2P out + results",
+  "js": "(() => { const w = game.world(); w.players.forEach(p => p.lives = 1); game.quiet(); game.put(9, 0); w.robots.push({id:953,f:9,x:0.3,home:3,face:-1,st:'walk',t:0,throwCd:9,thrower:false}); game.step(2.2); game.step(3); game.quiet(); game.put(9, 0); w.robots.push({id:954,f:9,x:0.3,home:3,face:-1,st:'walk',t:0,throwCd:9,thrower:false}); game.step(2.2); game.step(3); return new Promise(r => setTimeout(() => r(JSON.stringify([game.state().screen, Kit.lang.untranslated()])), 300)); })()",
+  "shot": "zh-results2"
+ },
+ {
+  "label": "1P won results",
+  "js": "(() => { game.start({go:true}); const w = game.world(); w.players[0].b = 4; w.players[0].score = 45000; w.phase = 'won'; game.showResults(); game.step(1); return new Promise(r => setTimeout(() => r(JSON.stringify([game.state().screen, Kit.lang.untranslated()])), 300)); })()",
+  "shot": "zh-won"
+ },
+ {
+  "label": "1P game over results",
+  "js": "(() => { game.start({go:true}); const w = game.world(); w.players[0].score = 1500; w.phase = 'over'; game.showResults(); game.step(1); return new Promise(r => setTimeout(() => r(JSON.stringify([game.state().screen, Kit.lang.untranslated()])), 300)); })()",
+  "shot": "zh-over"
+ },
+ {
+  "label": "english reload",
+  "js": "localStorage.setItem('claudeGames.lang', 'en'); location.reload(); 'reload'",
+  "wait": 5000
+ },
+ {
+  "label": "english: CJK on title, help, play, pause, results (the kit's 中文 switch label aside)",
+  "js": "(() => { game.hold(true); const found = new Set(); const look = () => { const cjk = /[\\u4e00-\\u9fff]/; const bad = []; document.querySelectorAll('body *').forEach(el => { if (el.closest && el.closest('#kit-lang-btn')) return; for (const n of el.childNodes) if (n.nodeType === 3 && cjk.test(n.textContent)) bad.push(n.textContent.trim()); for (const a of ['title', 'aria-label', 'placeholder']) { const v = el.getAttribute && el.getAttribute(a); if (v && cjk.test(v)) bad.push(a + ':' + v); } }); bad.forEach(b => found.add(b)); }; look(); Kit.help.open(); look(); Kit.help.close(); game.start({go:true}); game.call(); game.step(1.2); look(); game.pause(); look(); game.resume(); game.world().phase='over'; game.showResults(); look(); return new Promise(r => setTimeout(() => { look(); r(JSON.stringify([...found])); }, 300)); })()"
+ }
+]

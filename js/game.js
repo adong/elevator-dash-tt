@@ -650,7 +650,7 @@
     if (carried.parent !== P.hips) P.hips.add(carried);
     carried.visible = pl.done < w.L.targets.length && p.mode !== 'cheer';
     if (gone) return;
-    let x = p.x, y = S.py(w), mode = 'stand', ph = 0, want = p.face > 0 ? FACE_R : FACE_L;
+    let x = p.x, y = S.py(w) + (p.mode === 'car' ? 0.12 : 0), mode = 'stand', ph = 0, want = p.face > 0 ? FACE_R : FACE_L; // in a lift he stands on its floor plate
     let z = p.mode === 'car' ? Z_CAR : Z_WALK;
     if (w.phase === 'ready' && w.drop) {
       // the blimp lowers him onto the roof on a rope
@@ -778,7 +778,7 @@
       A.setFace(m, face);
       m.root.position.set(x, yy, z);
       m.root.scale.setScalar(s);
-      const want = r.st === 'float' || r.st === 'dizzy' ? PI : r.face > 0 ? FACE_R : FACE_L;
+      const want = r.st === 'float' || r.st === 'dizzy' ? PI : r.face > 0 ? -2.35 : 2.35; // turned toward the camera so the face shows
       m.root.rotation.y = turn(m.root.rotation.y, want, Math.min(1, dt * 12));
       // rolling, the arms swinging; winding up a towel throw
       const roll = r.st === 'walk' ? G.time * 9 : 0;
@@ -865,7 +865,7 @@
     const w = G.w;
     const k = 1 - Math.exp(-16 * dt);
     const cheer = G.cheerT > 0 || (G.scene2 && G.scene2.kind === 'clear') || w.phase === 'won';
-    const crowd = w.two ? [[w.players[1 - w.cp].who, -12.4]] : [['foxy', -12.4], ['froggy', 12.4]];
+    const crowd = w.two ? [[w.players[1 - w.cp].who, -9.7]] : [['foxy', -9.7], ['froggy', 9.7]]; // on the pavement in front of the garage
     for (const id of ['foxy', 'froggy']) people[id].root.visible = false;
     for (const [id, x] of crowd) {
       if (w.buddy && w.buddy.who === id) continue;
@@ -875,8 +875,8 @@
         if (id === 'teddy' || id === 'tommy') continue;
       }
       P.root.scale.setScalar(SCALE * (id === 'foxy' || id === 'froggy' ? 0.95 : 1));
-      P.root.position.set(x, 0, 2.2);
-      P.root.rotation.y = PI + (x < 0 ? 0.5 : -0.5);
+      P.root.position.set(x, 0, 2.3);
+      P.root.rotation.y = PI + (x < 0 ? -0.4 : 0.4);
       Kit.people.pose(P, G.time * 7, cheer ? 'wave' : 'stand', k);
       P.rig.position.y = cheer ? Math.abs(Math.sin(G.time * 7)) * 0.2 : 0;
     }
@@ -946,6 +946,7 @@
       if (o.level) G.level = o.level;
       play();
       if (o.building != null) { G.w.players.forEach((pl) => { pl.b = o.building; pl.x = null; }); S.loadBuilding(G.w, true); }
+      if (o.building != null) big(LV.NAMES[G.w.L.index], hotelLine());
       if (o.go) { G.w.phase = 'play'; G.w.phaseT = 0; G.w.drop = false; }
       placeCam(true);
       return state();
