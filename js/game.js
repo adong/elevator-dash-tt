@@ -44,7 +44,7 @@
     views: [], viewB: -1, scene2: null, cheerT: 0, overT: 0, throwT: 0, newRows: [], frame: 0,
     camY: NF * FH, k: 20, D: 40, offY: 0, doorAnim: {}, guestT: {}, stepSnd: 0,
   };
-  let renderer, scene, cam, confetti, stars, robotStars, cloud, treat, ball, peace, blimp, carried, budParcel, last = 0;
+  let renderer, scene, cam, confetti, stars, robotStars, cloud, treat, ball, peace, blimp, carried, budParcel, liftHint, last = 0;
   const people = {};
   let portraits = {};
   const robotMeshes = new Map(), robotPool = [];
@@ -100,6 +100,9 @@
     scene.add(blimp);
     carried = A.parcel(0.55); // in the kit's 2 m units: on the courier's back
     carried.position.set(0, 0.55, 0.36);
+    liftHint = A.emoji('⬇️', 0.55); // over his head at an open lift: which way to ride
+    liftHint.visible = false;
+    scene.add(liftHint);
     budParcel = A.parcel(0.3);
     budParcel.visible = false;
     scene.add(budParcel);
@@ -126,9 +129,13 @@
     const short = H <= 460, narrow = W <= 520;
     let top = short ? 48 : narrow ? 56 : 66, bottom = 6, left = 58, right = 10;
     if (document.body.classList.contains('touch') && G.screen === 'play') {
-      const s = short ? 0.82 : 1;
-      if (H > W) bottom = 186 * s + 18;
-      else { left = 64 + 186 * s + 4; right = 210 * s + 14; }
+      // keep the hotel clear of the touch buttons, wherever the CSS put them
+      const rect = (q) => [...document.querySelectorAll(q)].map((e) => e.getBoundingClientRect()).filter((b) => b.width);
+      const pads = rect('#touch .dk'), btns = rect('#touch .tb');
+      if (pads.length && btns.length) {
+        if (H > W) bottom = H - Math.min(...pads.concat(btns).map((b) => b.top)) + 10;
+        else { left = Math.max(...pads.map((b) => b.right)) + 6; right = W - Math.min(...btns.map((b) => b.left)) + 6; }
+      }
     }
     const sw = Math.max(50, W - left - right), sh = Math.max(50, H - top - bottom);
     const k = Math.min(sw / (BOX.x1 - BOX.x0), sh / BOX.h);
@@ -643,6 +650,7 @@
     stars.visible = false;
     ball.visible = false;
     peace.visible = false;
+    liftHint.visible = false;
     blimp.userData.rope.visible = false;
     if (sc && sc.kind === 'win') return winPose(sc, dt, k);
     const gone = w.phase === 'turn' || w.phase === 'over' || p.mode === 'gone' || (sc && sc.kind === 'clear' && sc.t > 2.2);
@@ -702,6 +710,17 @@
       P.head.getWorldPosition(v3);
       stars.position.set(v3.x, v3.y + 0.3, v3.z);
       stars.userData.spin(G.time);
+    }
+    // standing at an open lift: a bouncing arrow says which way to ride toward the next parcel (or the garage)
+    const s = p.mode === 'walk' && !G.demo && w.phase === 'play' ? LV.shaftAt(w.L, p.f, p.x) : null;
+    const c = s && w.cars[s.i];
+    if (c && c.at === p.f && c.to < 0 && c.door > 0.8) {
+      const tg = w.L.targets[pl.done];
+      const tf = tg ? tg.f : 0;
+      const dir = tf < p.f && s.lo < p.f ? '⬇️' : tf > p.f && s.hi > p.f ? '⬆️' : s.lo < p.f && s.hi > p.f ? '↕️' : s.lo < p.f ? '⬇️' : '⬆️';
+      if (liftHint.userData.e !== dir) { liftHint.userData.e = dir; liftHint.material.map = Kit.gfx.emojiTexture(dir); }
+      liftHint.visible = true;
+      liftHint.position.set(p.x, y + 1.85 + Math.abs(Math.sin(G.time * 5)) * 0.18, 0.6);
     }
     // blinking while safe after a bump
     if (p.inv > 0 && p.mode === 'walk') P.root.visible = Math.floor(G.time * 10) % 2 === 0;
