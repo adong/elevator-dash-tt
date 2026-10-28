@@ -23,13 +23,13 @@
   const NAMES = ['HOTEL CUPCAKE', 'HOTEL BANANA', 'HOTEL PANDA', 'HOTEL ROCKET', 'HOTEL RAINBOW'];
   const EMOJI = ['🧁', '🍌', '🐼', '🚀', '🌈'];
   const GUESTS = ['🐰', '🐻', '🐨', '🦁', '🐷', '🐮', '🐵', '🐯', '🐧', '🦄', '🐹', '🐶'];
-  // wallpaper, its pattern colour, the floor, the doors, the lift frames
+  // wallpaper, its pattern colour, the floor, the doors, door frames, lift frames, the outside walls, the lift cars
   const PAL = [
-    { wall: '#ffd6e7', dot: '#ffb3cf', floor: '#c2185b', door: '#ff8fb8', frame: '#ffffff', lift: '#ff4d8d', outer: '#ff7aa8' },
-    { wall: '#fff3b0', dot: '#ffe066', floor: '#e09f00', door: '#ffd23f', frame: '#7a4f00', lift: '#ffb000', outer: '#ffd23f' },
-    { wall: '#e6f7e9', dot: '#c3ebc9', floor: '#2e7d32', door: '#ffffff', frame: '#14121f', lift: '#4caf50', outer: '#8bd99a' },
-    { wall: '#dceaff', dot: '#bcd5ff', floor: '#2b4fd1', door: '#ff7043', frame: '#ffffff', lift: '#3d7bff', outer: '#8fb4ff' },
-    { wall: '#f1e4ff', dot: '#ddc4ff', floor: '#7b3fe4', door: '#4dd0e1', frame: '#ffffff', lift: '#b05cff', outer: '#c79bff' },
+    { wall: '#ffd6e7', dot: '#ffb3cf', floor: '#c2185b', door: '#ff8fb8', frame: '#ffffff', lift: '#ff4d8d', outer: '#ff7aa8', car: '#ffe066' },
+    { wall: '#fff3b0', dot: '#ffe066', floor: '#e09f00', door: '#ffd23f', frame: '#7a4f00', lift: '#ffb000', outer: '#ffd23f', car: '#7fdcff' },
+    { wall: '#e6f7e9', dot: '#c3ebc9', floor: '#2e7d32', door: '#ffffff', frame: '#14121f', lift: '#4caf50', outer: '#8bd99a', car: '#ffb3d1' },
+    { wall: '#dceaff', dot: '#bcd5ff', floor: '#2b4fd1', door: '#ff7043', frame: '#ffffff', lift: '#3d7bff', outer: '#8fb4ff', car: '#ffe066' },
+    { wall: '#f1e4ff', dot: '#ddc4ff', floor: '#7b3fe4', door: '#4dd0e1', frame: '#ffffff', lift: '#b05cff', outer: '#c79bff', car: '#7dff9a' },
   ];
 
   // a fixed little random generator per building, so each hotel is the same every game (kids learn the way)
